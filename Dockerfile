@@ -1,1 +1,1 @@
-FROM ygkkk/argosb
+FROM hsanaeii/3x-ui:latest
