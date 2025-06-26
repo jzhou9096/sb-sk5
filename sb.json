@@ -46,7 +46,7 @@
       "type": "direct",
       "tag": "direct"
     }
-    # 如果你需要其他出站（如代理链），需要在这里添加
+
   ],
   "route": {
     "rules": [],
