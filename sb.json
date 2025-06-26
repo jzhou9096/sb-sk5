@@ -21,8 +21,8 @@
         "alpn": [
           "h3"
         ],
-        "certificate_path": "/etc/sing-box/cert.pem",  <-- 注意路径改变！
-        "key_path": "/etc/sing-box/private.key"      <-- 注意路径改变！
+        "certificate_path": "/etc/sing-box/cert.pem", 
+        "key_path": "/etc/sing-box/private.key"     
       }
     },
     {
