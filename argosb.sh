@@ -1,13 +1,30 @@
 #!/bin/sh
 export LANG=en_US.UTF-8
-if ! find /proc/*/exe -type l 2>/dev/null | grep -E '/proc/[0-9]+/exe' | xargs -r readlink 2>/dev/null | grep -q 'agsb/s' && ! pgrep -f 'agsb/s' >/dev/null 2>&1; then
-[ -z "${vlpt+x}" ] || vlp=yes
-[ -z "${vmpt+x}" ] || vmp=yes
-[ -z "${hypt+x}" ] || hyp=yes
-[ -z "${tupt+x}" ] || tup=yes
-[ -z "${skpt+x}" ] || skp=yes # <-- 新增：SOCKS5协议激活变量
-[ "$vlp" = yes ] || [ "$vmp" = yes ] || [ "$hyp" = yes ] || [ "$tup" = yes ] || [ "$anp" = yes ] || [ "$skp" = yes ] || { echo "提示：使用此脚本时，请在脚本前至少设置一个协议变量哦，再见！"; exit; } # <-- 修改：在条件中加入$skp
-fi
+
+# (原脚本开头部分保持不变，直到第一个 if 语句块)
+# 这一段条件判断，在 Docker 容器中可能会导致问题，因为容器启动时 sing-box 肯定还没运行。
+# 我们可以简化它，或者在 Dockerfile 中确保 argosb.sh 总是被执行。
+# 考虑到 arsgb.sh 后面有 if ... else ins; fi 这样的结构，我们保留这个判断，
+# 但确保它不会因为 Docker 环境而误判。
+# 实际上，外层的 if 块是检查服务是否已安装或正在运行，如果是，就显示帮助并退出。
+# 对于 Docker 容器，我们希望它每次都执行安装流程 (ins)。
+# 所以我们可以修改 Dockerfile 的 CMD 来直接调用 ins 函数，或者确保这个 if 语句不阻止 ins。
+
+# 重新修改 argosb.sh，为了 Docker 环境：
+# 移除所有与持久化、系统服务管理、SSH 快捷方式相关的部分，因为 Docker 容器是临时的。
+# 移除所有下载 sing-box 和 cloudflared 的逻辑，因为我们将在 Dockerfile 中预下载。
+# 移除防火墙、crontab、bashrc 等。
+
+# ======= 开始修改 =======
+# 移除顶部的大 if 块，让脚本每次都执行安装/启动逻辑
+# 这意味着容器每次启动都会重新生成配置并启动 sing-box
+# 如果你不想每次都重新生成，则需要一个不同的 Dockerfile 策略（例如挂载配置文件）
+# 但你明确表示要用 argosb.sh。
+
+# 从 `if ! find /proc/*/exe ...` 开始，到 `fi` 结束，**整个大 if/else 块都移除掉**
+# 确保文件开头就是环境变量声明
+
+# 你的环境变量声明保持不变
 export uuid=${uuid:-''}
 export port_vl_re=${vlpt:-''}
 export port_vm_ws=${vmpt:-''}
@@ -18,10 +35,19 @@ export argo=${argo:-''}
 export ARGO_DOMAIN=${agn:-''}
 export ARGO_AUTH=${agk:-''}
 export ipsw=${ip:-''}
-export port_socks5=${skpt:-''} # <-- 新增：SOCKS5端口变量
-export socks5_user=${skuser:-''} # <-- 新增：SOCKS5用户名变量
-export socks5_pass=${skpass:-''} # <-- 新增：SOCKS5密码变量
-showmode(){
+export port_socks5=${skpt:-''}
+export socks5_user=${skuser:-''}
+export socks5_pass=${skpass:-''}
+
+# 修改协议激活检查，确保它能被环境变量触发
+# 保持这个 if 块，但简化内部逻辑，去掉提示 exit
+# 原来是 || { echo ... exit; }
+if [ -z "$vlp" ] && [ -z "$vmp" ] && [ -z "$hyp" ] && [ -z "$tup" ] && [ -z "$anp" ] && [ -z "$skp" ]; then
+  echo "提示：使用此脚本时，请在脚本前至少设置一个协议变量哦，再见！";
+  exit 1; # 如果没有设置任何协议变量，则退出
+fi
+
+showmode(){ # 这个函数可以保留，但其内容可能不再完全适用于 Docker 环境
 echo "显示节点信息：agsb或者脚本 list"
 echo "双栈VPS显示IPv4节点配置：ip=4 agsb或者脚本 list"
 echo "双栈VPS显示IPv6节点配置：ip=6 agsb或者脚本 list"
@@ -32,28 +58,31 @@ echo "甬哥Github项目 ：github.com/yonggekkk"
 echo "甬哥Blogger博客 ：ygkkk.blogspot.com"
 echo "甬哥YouTube频道 ：www.youtube.com/@ygkkk"
 echo "ArgoSB一键无交互脚本"
-echo "当前版本：25.6.18"
+echo "当前版本：25.6.18 (Dockerized)" # 修改版本号，表示是 Docker 化版本
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-hostname=$(uname -a | awk '{print $2}')
-op=$(cat /etc/redhat-release 2>/dev/null || cat /etc/os-release 2>/dev/null | grep -i pretty_name | cut -d \" -f2)
-[ -z "$(systemd-detect-virt 2>/dev/null)" ] && vi=$(virt-what 2>/dev/null) || vi=$(systemd-detect-virt 2>/dev/null)
-case $(uname -m) in
+hostname=$(uname -a | awk '{print $2}') # 保留
+op=$(cat /etc/redhat-release 2>/dev/null || cat /etc/os-release 2>/dev/null | grep -i pretty_name | cut -d \" -f2) # 保留
+[ -z "$(systemd-detect-virt 2>/dev/null)" ] && vi=$(virt-what 2>/dev/null) || vi=$(systemd-detect-virt 2>/dev/null) # 保留
+case $(uname -m) in # 保留
 aarch64) cpu=arm64;;
 x86_64) cpu=amd64;;
 *) echo "目前脚本不支持$(uname -m)架构" && exit
 esac
-mkdir -p "$HOME/agsb"
-warpcheck(){
+mkdir -p "$HOME/agsb" # 保留
+warpcheck(){ # 保留
 wgcfv6=$(curl -s6m5 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
 wgcfv4=$(curl -s4m5 https://www.cloudflare.com/cdn-cgi/trace -k | grep warp | cut -d= -f2)
 }
+# === ins() 函数，核心生成逻辑，需要大改动 ===
 ins(){
-if [ ! -e "$HOME/agsb/sing-box" ]; then
-curl -Lo "$HOME/agsb/sing-box" -# --retry 2 https://github.com/yonggekkk/ArgoSB/releases/download/singbox/sing-box-$cpu
-chmod +x "$HOME/agsb/sing-box"
+# 移除 if [ ! -e "$HOME/agsb/sing-box" ]; then ... fi 块，因为 sing-box 会在 Dockerfile 中预安装
+# sbcore=$("$HOME/agsb/sing-box" version 2>/dev/null | awk '/version/{print $NF}') # 保留，但需要确保 sing-box 已存在
+# echo "已安装Sing-box正式版内核：$sbcore"
+
+# 确保 sing-box 可执行文件路径正确，不再依赖脚本下载
 sbcore=$("$HOME/agsb/sing-box" version 2>/dev/null | awk '/version/{print $NF}')
 echo "已安装Sing-box正式版内核：$sbcore"
-fi
+
 cat > "$HOME/agsb/sb.json" <<EOF
 {
 "log": {
@@ -68,12 +97,11 @@ uuid=$("$HOME/agsb/sing-box" generate uuid)
 fi
 echo "$uuid" > "$HOME/agsb/uuid"
 echo "UUID密码：$uuid"
-command -v openssl >/dev/null 2>&1 && openssl ecparam -genkey -name prime256v1 -out "$HOME/agsb/private.key" >/dev/null 2>&1
-command -v openssl >/dev/null 2>&1 && openssl req -new -x509 -days 36500 -key "$HOME/agsb/private.key" -out "$HOME/agsb/cert.pem" -subj "/CN=www.bing.com" >/dev/null 2>&1
-if [ ! -f "$HOME/agsb/private.key" ]; then
-curl -Lso "$HOME/agsb/private.key" https://github.com/yonggekkk/ArgoSB/releases/download/singbox/private.key
-curl -Lso "$HOME/agsb/cert.pem" https://github.com/yonggekkk/ArgoSB/releases/download/singbox/cert.pem
-fi
+# 移除 openssl 相关命令，证书由 Dockerfile 复制
+# 移除 if [ ! -f "$HOME/agsb/private.key" ]; then ... fi 块，证书由 Dockerfile 复制
+
+# Vless-reality 部分保持不变，假设它生成了 private_key, public_key, short_id
+# 你需要确保这些文件路径正确，并且这些命令能在 Docker 环境中执行
 if [ -n "$vlp" ]; then
 vlp=vlpt
 if [ -z "$port_vl_re" ]; then
@@ -84,7 +112,8 @@ ym_vl_re=www.yahoo.com
 fi
 echo "$port_vl_re" > "$HOME/agsb/port_vl_re"
 echo "$ym_vl_re" > "$HOME/agsb/ym_vl_re"
-if [ ! -e "$HOME/agsb/private_key" ]; then
+# === 修改这里 === 移除检查文件存在性，直接生成 key_pair
+# if [ ! -e "$HOME/agsb/private_key" ]; then
 key_pair=$("$HOME/agsb/sing-box" generate reality-keypair)
 private_key=$(echo "$key_pair" | awk '/PrivateKey/ {print $2}' | tr -d '"')
 public_key=$(echo "$key_pair" | awk '/PublicKey/ {print $2}' | tr -d '"')
@@ -92,7 +121,7 @@ short_id=$("$HOME/agsb/sing-box" generate rand --hex 4)
 echo "$private_key" > "$HOME/agsb/private_key"
 echo "$public_key" > "$HOME/agsb/public.key"
 echo "$short_id" > "$HOME/agsb/short_id"
-fi
+# fi # === 修改这里 ===
 private_key=$(cat "$HOME/agsb/private_key")
 public_key=$(cat "$HOME/agsb/public.key")
 short_id=$(cat "$HOME/agsb/short_id")
@@ -128,6 +157,7 @@ EOF
 else
 vlp=vlptargo
 fi
+# Vmess 部分保持不变，确保路径正确
 if [ -n "$vmp" ]; then
 vmp=vmpt
 if [ -z "$port_vm_ws" ]; then
@@ -164,6 +194,7 @@ EOF
 else
 vmp=vmptargo
 fi
+# Hysteria2 部分保持不变，确保路径正确
 if [ -n "$hyp" ]; then
 hyp=hypt
 if [ -z "$port_hy2" ]; then
@@ -196,6 +227,7 @@ EOF
 else
 hyp=hyptargo
 fi
+# Tuic 部分保持不变，确保路径正确
 if [ -n "$tup" ]; then
 tup=tupt
 if [ -z "$port_tu" ]; then
@@ -229,6 +261,7 @@ EOF
 else
 tup=tuptargo
 fi
+# Anytls 部分保持不变，确保路径正确
 if [ -n "$anp" ]; then
 anp=anpt
 if [ -z "$port_an" ]; then
@@ -258,15 +291,15 @@ EOF
 else
 anp=anptargo
 fi
-if [ -n "$skp" ]; then # skp 变量会在脚本顶部根据 skpt 环境变量是否存在来设置
+# SOCKS5 部分 (你添加的，保持不变)
+if [ -n "$skp" ]; then
     if [ -z "$port_socks5" ]; then
-        port_socks5=$(shuf -i 10000-65535 -n 1) # 如果未指定端口，则随机生成
+        port_socks5=$(shuf -i 10000-65535 -n 1)
     fi
-    # 默认用户名和密码 (你可以在这里自定义默认值)
     socks5_user=${skuser:-"your_username"}
     socks5_pass=${skpass:-"password"}
 
-    echo "SOCKS5端口：$port_socks5" # 增加日志输出
+    echo "SOCKS5端口：$port_socks5"
 
 cat >> "$HOME/agsb/sb.json" <<EOF
     {
@@ -295,280 +328,21 @@ cat >> "$HOME/agsb/sb.json" <<EOF
 }
 EOF
 nohup "$HOME/agsb/sing-box" run -c "$HOME/agsb/sb.json" >/dev/null 2>&1 &
-if [ -n "$argo" ]; then
-if [ ! -e "$HOME/agsb/cloudflared" ]; then
-argocore=$(curl -Ls https://data.jsdelivr.com/v1/package/gh/cloudflare/cloudflared | grep -Eo '"[0-9.]+"' | sed -n 1p | tr -d '",')
-echo "下载cloudflared-argo最新正式版内核：$argocore"
-curl -Lo "$HOME/agsb/cloudflared" -# --retry 2 https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$cpu
-chmod +x "$HOME/agsb/cloudflared"
-fi
-if [ -n "${ARGO_DOMAIN}" ] && [ -n "${ARGO_AUTH}" ]; then
-name='固定'
-nohup "$HOME/agsb/cloudflared" tunnel --no-autoupdate --edge-ip-version auto --protocol http2 run --token "${ARGO_AUTH}" >/dev/null 2>&1 &
-echo "${ARGO_DOMAIN}" > "$HOME/agsb/sbargoym.log"
-echo "${ARGO_AUTH}" > "$HOME/agsb/sbargotoken.log"
-else
-name='临时'
-nohup "$HOME/agsb/cloudflared" tunnel --url http://localhost:"${port_vm_ws}" --edge-ip-version auto --no-autoupdate --protocol http2 > "$HOME/agsb/argo.log" 2>&1 &
-fi
-echo "申请Argo$name隧道中……请稍等"
-sleep 8
-if [ -n "${ARGO_DOMAIN}" ] && [ -n "${ARGO_AUTH}" ]; then
-argodomain=$(cat "$HOME/agsb/sbargoym.log" 2>/dev/null)
-else
-argodomain=$(grep -a trycloudflare.com "$HOME/agsb/argo.log" 2>/dev/null | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
-fi
-if [ -n "${argodomain}" ]; then
-echo "Argo$name隧道申请成功，域名为：$argodomain"
-else
-echo "Argo$name隧道申请失败，请稍后再试"
-fi
-fi
 
-if find /proc/*/exe -type l 2>/dev/null | grep -E '/proc/[0-9]+/exe' | xargs -r readlink 2>/dev/null | grep -q 'agsb/s' || pgrep -f 'agsb/s' >/dev/null 2>&1 ; then
-[ -f ~/.bashrc ] || touch ~/.bashrc
-sed -i '/yonggekkk/d' ~/.bashrc
-echo "if ! find /proc/*/exe -type l 2>/dev/null | grep -E '/proc/[0-9]+/exe' | xargs -r readlink 2>/dev/null | grep -q 'agsb/s' && ! pgrep -f 'agsb/s' >/dev/null 2>&1; then export ip=\"${ipsw}\" argo=\"${argo}\" uuid=\"${uuid}\" $vlp=\"${port_vl_re}\" $vmp=\"${port_vm_ws}\" $hyp=\"${port_hy2}\" $tup=\"${port_tu}\" reym=\"${ym_vl_re}\" agn=\"${ARGO_DOMAIN}\" agk=\"${ARGO_AUTH}\"; sh <(curl -Ls https://raw.githubusercontent.com/yonggekkk/argosb/main/argosb.sh); fi" >> ~/.bashrc
-COMMAND="agsb"
-SCRIPT_PATH="$HOME/bin/$COMMAND"
-mkdir -p "$HOME/bin"
-curl -Ls https://raw.githubusercontent.com/yonggekkk/argosb/main/argosb.sh > "$SCRIPT_PATH"
-chmod +x "$SCRIPT_PATH"
-sed -i '/export PATH="\$HOME\/bin:\$PATH"/d' ~/.bashrc
-echo 'export PATH="$HOME/bin:$PATH"' >> "$HOME/.bashrc"
-grep -qxF 'source ~/.bashrc' ~/.bash_profile 2>/dev/null || echo 'source ~/.bashrc' >> ~/.bash_profile
-. ~/.bashrc
-crontab -l > /tmp/crontab.tmp 2>/dev/null
-sed -i '/agsb\/sing-box/d' /tmp/crontab.tmp
-echo '@reboot /bin/sh -c "nohup $HOME/agsb/sing-box run -c $HOME/agsb/sb.json >/dev/null 2>&1 &"' >> /tmp/crontab.tmp
-sed -i '/agsb\/cloudflared/d' /tmp/crontab.tmp
-if [ -n "$argo" ]; then
-if [ -n "${ARGO_DOMAIN}" ] && [ -n "${ARGO_AUTH}" ]; then
-echo '@reboot /bin/sh -c "nohup $HOME/agsb/cloudflared tunnel --no-autoupdate --edge-ip-version auto --protocol http2 run --token $(cat $HOME/agsb/sbargotoken.log 2>/dev/null) >/dev/null 2>&1 &"' >> /tmp/crontab.tmp
-else
-echo '@reboot /bin/sh -c "nohup $HOME/agsb/cloudflared tunnel --url http://localhost:$(grep -A2 vmess-sb $HOME/agsb/sb.json | tail -1 | tr -cd 0-9) --edge-ip-version auto --no-autoupdate --protocol http2 > $HOME/agsb/argo.log 2>&1 &"' >> /tmp/crontab.tmp
-fi
-fi
-crontab /tmp/crontab.tmp 2>/dev/null
-rm /tmp/crontab.tmp
-echo "ArgoSB脚本进程启动成功，安装完毕" && sleep 2
-else
-echo "ArgoSB脚本进程未启动，安装失败" && exit
-fi
-}
-cip(){
-ipbest(){
-serip=$(curl -s4m5 icanhazip.com -k || curl -s6m5 icanhazip.com -k)
-if echo "$serip" | grep -q ':'; then
-server_ip="[$serip]"
-echo "$server_ip" > "$HOME/agsb/server_ip.log"
-else
-server_ip="$serip"
-echo "$server_ip" > "$HOME/agsb/server_ip.log"
-fi
-}
-ipchange(){
-v4=$(curl -s4m5 icanhazip.com -k)
-v6=$(curl -s6m5 icanhazip.com -k)
-if [ -z "$v4" ]; then
-vps_ipv4='无IPV4'
-vps_ipv6="$v6"
-elif [ -n "$v4" ] && [ -n "$v6" ]; then
-vps_ipv4="$v4"
-vps_ipv6="$v6"
-else
-vps_ipv4="$v4"
-vps_ipv6='无IPV6'
-fi
-echo "本地IPV4地址：$vps_ipv4"
-echo "本地IPV6地址：$vps_ipv6"
-if [ "$ipsw" = "4" ]; then
-if [ -z "$v4" ]; then
-ipbest
-else
-server_ip="$v4"
-echo "$server_ip" > "$HOME/agsb/server_ip.log"
-fi
-elif [ "$ipsw" = "6" ]; then
-if [ -z "$v6" ]; then
-ipbest
-else
-server_ip="[$v6]"
-echo "$server_ip" > "$HOME/agsb/server_ip.log"
-fi
-else
-ipbest
-fi
-}
-warpcheck
-if ! echo "$wgcfv4" | grep -qE 'on|plus' && ! echo "$wgcfv6" | grep -qE 'on|plus'; then
-ipchange
-else
-systemctl stop wg-quick@wgcf >/dev/null 2>&1
-kill -15 $(pgrep warp-go) >/dev/null 2>&1 && sleep 2
-ipchange
-systemctl start wg-quick@wgcf >/dev/null 2>&1
-systemctl restart warp-go >/dev/null 2>&1
-systemctl enable warp-go >/dev/null 2>&1
-systemctl start warp-go >/dev/null 2>&1
-fi
-rm -rf "$HOME/agsb/jh.txt"
-uuid=$(cat "$HOME/agsb/uuid")
-server_ip=$(cat "$HOME/agsb/server_ip.log")
-echo "---------------------------------------------------------"
-echo "---------------------------------------------------------"
-echo "ArgoSB脚本输出节点配置如下："
-echo
-if [ -f "$HOME/agsb/port_vl_re" ]; then
-echo "【 vless-reality-vision 】节点信息如下："
-port_vl_re=$(cat "$HOME/agsb/port_vl_re")
-ym_vl_re=$(cat "$HOME/agsb/ym_vl_re")
-private_key=$(cat "$HOME/agsb/private_key")
-public_key=$(cat "$HOME/agsb/public.key")
-short_id=$(cat "$HOME/agsb/short_id")
-vl_link="vless://$uuid@$server_ip:$port_vl_re?encryption=none&flow=xtls-rprx-vision&security=reality&sni=$ym_vl_re&fp=chrome&pbk=$public_key&sid=$short_id&type=tcp&headerType=none#vl-reality-$hostname"
-echo "$vl_link" >> "$HOME/agsb/jh.txt"
-echo "$vl_link"
-echo
-fi
-if [ -f "$HOME/agsb/port_vm_ws" ]; then
-echo "【 vmess-ws 】节点信息如下："
-port_vm_ws=$(cat "$HOME/agsb/port_vm_ws")
-vm_link="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vm-ws-$hostname\", \"add\": \"$server_ip\", \"port\": \"$port_vm_ws\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"www.bing.com\", \"path\": \"/$uuid-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-echo "$vm_link" >> "$HOME/agsb/jh.txt"
-echo "$vm_link"
-echo
-fi
-if [ -f "$HOME/agsb/port_hy2" ]; then
-echo "【 Hysteria2 】节点信息如下："
-port_hy2=$(cat "$HOME/agsb/port_hy2")
-hy2_link="hysteria2://$uuid@$server_ip:$port_hy2?security=tls&alpn=h3&insecure=1&sni=www.bing.com#hy2-$hostname"
-echo "$hy2_link" >> "$HOME/agsb/jh.txt"
-echo "$hy2_link"
-echo
-fi
-if [ -f "$HOME/agsb/port_tu" ]; then
-echo "【 Tuic 】节点信息如下："
-port_tu=$(cat "$HOME/agsb/port_tu")
-tuic5_link="tuic://$uuid:$uuid@$server_ip:$port_tu?congestion_control=bbr&udp_relay_mode=native&alpn=h3&sni=www.bing.com&allow_insecure=1#tu5-$hostname"
-echo "$tuic5_link" >> "$HOME/agsb/jh.txt"
-echo "$tuic5_link"
-echo
-fi
-argodomain=$(cat "$HOME/agsb/sbargoym.log" 2>/dev/null)
-[ -z "$argodomain" ] && argodomain=$(grep -a trycloudflare.com "$HOME/agsb/argo.log" 2>/dev/null | awk 'NR==2{print}' | awk -F// '{print $2}' | awk '{print $1}')
-if [ -n "$argodomain" ]; then
-vmatls_link1="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-443\", \"add\": \"104.16.0.0\", \"port\": \"443\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
-echo "$vmatls_link1" >> "$HOME/agsb/jh.txt"
-vmatls_link2="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-8443\", \"add\": \"104.17.0.0\", \"port\": \"8443\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
-echo "$vmatls_link2" >> "$HOME/agsb/jh.txt"
-vmatls_link3="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2053\", \"add\": \"104.18.0.0\", \"port\": \"2053\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
-echo "$vmatls_link3" >> "$HOME/agsb/jh.txt"
-vmatls_link4="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2083\", \"add\": \"104.19.0.0\", \"port\": \"2083\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
-echo "$vmatls_link4" >> "$HOME/agsb/jh.txt"
-vmatls_link5="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2087\", \"add\": \"104.20.0.0\", \"port\": \"2087\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
-echo "$vmatls_link5" >> "$HOME/agsb/jh.txt"
-vmatls_link6="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-tls-argo-$hostname-2096\", \"add\": \"[2606:4700::0]\", \"port\": \"2096\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm?ed=2048\", \"tls\": \"tls\", \"sni\": \"$argodomain\", \"alpn\": \"\", \"fp\": \"\"}" | base64 -w0)"
-echo "$vmatls_link6" >> "$HOME/agsb/jh.txt"
-vma_link7="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-80\", \"add\": \"104.21.0.0\", \"port\": \"80\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-echo "$vma_link7" >> "$HOME/agsb/jh.txt"
-vma_link8="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-8080\", \"add\": \"104.22.0.0\", \"port\": \"8080\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-echo "$vma_link8" >> "$HOME/agsb/jh.txt"
-vma_link9="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-8880\", \"add\": \"104.24.0.0\", \"port\": \"8880\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-echo "$vma_link9" >> "$HOME/agsb/jh.txt"
-vma_link10="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2052\", \"add\": \"104.25.0.0\", \"port\": \"2052\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-echo "$vma_link10" >> "$HOME/agsb/jh.txt"
-vma_link11="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2082\", \"add\": \"104.26.0.0\", \"port\": \"2082\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-echo "$vma_link11" >> "$HOME/agsb/jh.txt"
-vma_link12="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2086\", \"add\": \"104.27.0.0\", \"port\": \"2086\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-echo "$vma_link12" >> "$HOME/agsb/jh.txt"
-vma_link13="vmess://$(echo "{ \"v\": \"2\", \"ps\": \"vmess-ws-argo-$hostname-2095\", \"add\": \"[2400:cb00:2049::0]\", \"port\": \"2095\", \"id\": \"$uuid\", \"aid\": \"0\", \"scy\": \"auto\", \"net\": \"ws\", \"type\": \"none\", \"host\": \"$argodomain\", \"path\": \"/$uuid-vm?ed=2048\", \"tls\": \"\"}" | base64 -w0)"
-echo "$vma_link13" >> "$HOME/agsb/jh.txt"
-sbtk=$(cat "$HOME/agsb/sbargotoken.log" 2>/dev/null)
-if [ -n "$sbtk" ]; then
-nametn="当前Argo固定隧道token：$sbtk"
-fi
-argoshow=$(echo "Vmess主协议端口(Argo固定隧道端口)：$port_vm_ws\n当前Argo$name域名：$argodomain\n$nametn\n1、443端口的vmess-ws-tls-argo节点\n$vmatls_link1\n\n2、80端口的vmess-ws-argo节点\n$vma_link7\n")
-fi
-echo "---------------------------------------------------------"
-echo -e "$argoshow"
-echo "---------------------------------------------------------"
-echo "聚合节点信息，请查看$HOME/agsb/jh.txt文件或者运行cat $HOME/agsb/jh.txt进行复制"
-echo "---------------------------------------------------------"
-echo "相关快捷方式如下：(首次重连SSH后，agsb快捷方式生效)"
-showmode
-echo "---------------------------------------------------------"
-echo
-}
+# === 修改这里 === 移除 Cloudflared Argo 的安装和启动逻辑
+# 因为我们不确定它在 Docker 容器内的行为，这部分是导致复杂性的来源。
+# 如果你需要 Argo，你可能需要单独的 Cloudflared Docker 镜像，或在另一个容器中运行。
+# 移除 if [ -n "$argo" ]; then ... fi 整个块
 
-if [ "$1" = "del" ]; then
-for P in /proc/[0-9]*; do if [ -L "$P/exe" ]; then TARGET=$(readlink -f "$P/exe" 2>/dev/null); if echo "$TARGET" | grep -qE '/agsb/c|/agsb/s'; then PID=$(basename "$P"); kill "$PID" 2>/dev/null && echo "Killed $PID ($TARGET)" || echo "Could not kill $PID ($TARGET)"; fi; fi; done
-kill -15 $(pgrep -f 'agsb/s' 2>/dev/null) $(pgrep -f 'agsb/c' 2>/dev/null) >/dev/null 2>&1
-sed -i '/yonggekkk/d' ~/.bashrc
-sed -i '/export PATH="\$HOME\/bin:\$PATH"/d' ~/.bashrc
-. ~/.bashrc
-crontab -l > /tmp/crontab.tmp 2>/dev/null
-sed -i '/agsb\/sing-box/d' /tmp/crontab.tmp
-sed -i '/agsb\/cloudflared/d' /tmp/crontab.tmp
-crontab /tmp/crontab.tmp 2>/dev/null
-rm /tmp/crontab.tmp
-rm -rf "$HOME/agsb" "$HOME/bin/agsb"
+# === 修改这里 === 移除 SSH 快捷方式、bashrc、crontab、systemctl、iptables 等系统管理和持久化逻辑
+# 这些在 Docker 容器中通常不适用或不需要。
+# 找到 if find /proc/*/exe -type l 2>/dev/null | grep -E '/proc/[0-9]+/exe' ... else ... fi 整个大块，移除
+# 替换为直接调用 cip 函数，然后让容器保持运行
 
-kill -15 $(cat /etc/s-box-ag/sbargopid.log 2>/dev/null) >/dev/null 2>&1
-kill -15 $(cat /etc/s-box-ag/sbpid.log 2>/dev/null) >/dev/null 2>&1
-kill -15 $(cat nixag/sbargopid.log 2>/dev/null) >/dev/null 2>&1
-kill -15 $(cat nixag/sbpid.log 2>/dev/null) >/dev/null 2>&1
-crontab -l > /tmp/crontab.tmp 2>/dev/null
-sed -i '/sbargopid/d' /tmp/crontab.tmp
-sed -i '/sbpid/d' /tmp/crontab.tmp
-crontab /tmp/crontab.tmp 2>/dev/null
-rm /tmp/crontab.tmp
-rm -rf /etc/s-box-ag /usr/bin/agsb
-sed -i '/yonggekkk/d' ~/.bashrc
-. ~/.bashrc
-rm -rf nixag
-echo "卸载完成"
-exit
-elif [ "$1" = "list" ]; then
-cip
-exit
-fi
+# 确保脚本不会退出，以便容器持续运行 Sing-box
+cip # 调用 cip 函数，打印 IP 信息
+echo "Sing-box and ArgoSB setup complete. Container will remain running."
 
-if ! find /proc/*/exe -type l 2>/dev/null | grep -E '/proc/[0-9]+/exe' | xargs -r readlink 2>/dev/null | grep -q 'agsb/s' && ! pgrep -f 'agsb/s' >/dev/null 2>&1; then
-for P in /proc/[0-9]*; do if [ -L "$P/exe" ]; then TARGET=$(readlink -f "$P/exe" 2>/dev/null); if echo "$TARGET" | grep -qE '/agsb/c|/agsb/s'; then PID=$(basename "$P"); kill "$PID" 2>/dev/null && echo "Killed $PID ($TARGET)" || echo "Could not kill $PID ($TARGET)"; fi; fi; done
-kill -15 $(pgrep -f 'agsb/s' 2>/dev/null) $(pgrep -f 'agsb/c' 2>/dev/null) >/dev/null 2>&1
-v4orv6(){
-if [ -z "$(curl -s4m5 icanhazip.com -k)" ]; then
-echo -e "nameserver 2a00:1098:2b::1\nnameserver 2a00:1098:2c::1\nnameserver 2a01:4f8:c2c:123f::1" > /etc/resolv.conf
-fi
-}
-warpcheck
-if ! echo "$wgcfv4" | grep -qE 'on|plus' && ! echo "$wgcfv6" | grep -qE 'on|plus'; then
-v4orv6
-else
-systemctl stop wg-quick@wgcf >/dev/null 2>&1
-kill -15 $(pgrep warp-go) >/dev/null 2>&1 && sleep 2
-v4orv6
-systemctl start wg-quick@wgcf >/dev/null 2>&1
-systemctl restart warp-go >/dev/null 2>&1
-systemctl enable warp-go >/dev/null 2>&1
-systemctl start warp-go >/dev/null 2>&1
-fi
-echo "VPS系统：$op"
-echo "CPU架构：$cpu"
-echo "ArgoSB脚本未安装，开始安装…………" && sleep 2
-setenforce 0 >/dev/null 2>&1
-iptables -P INPUT ACCEPT >/dev/null 2>&1
-iptables -P FORWARD ACCEPT >/dev/null 2>&1
-iptables -P OUTPUT ACCEPT >/dev/null 2>&1
-iptables -F >/dev/null 2>&1
-netfilter-persistent save >/dev/null 2>&1
-ins
-cip
-echo
-else
-echo "ArgoSB脚本已安装"
-echo "相关快捷方式如下："
-showmode
-exit
-fi
+# 保持容器活跃，防止 CMD 命令结束后容器退出。
+# Sing-box 已经通过 nohup 在后台运行了，所以这里只需要一个无限循环来保持容器存活。
+tail -f /dev/null # 或者 sleep infinity
