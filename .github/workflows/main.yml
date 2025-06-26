@@ -1,13 +1,10 @@
 name: Build and Push Docker Image
 
 on:
-  push:
-    branches:
-      - main # 当推送到 main 分支时触发构建 (如果你的主分支是master，请改为master)
-  workflow_dispatch: # 允许手动触发工作流
+  workflow_dispatch: # 只保留手动触发工作流的功能
 
 env:
-  IMAGE_NAME: jzho/sb-sk5 # 你在Docker Hub上的镜像名称
+  IMAGE_NAME: jzho/sb-sk5 # 你在Docker Hub上的镜像名称 (确认 jzhou 是你的用户名)
 
 jobs:
   build-and-push:
@@ -33,8 +30,3 @@ jobs:
         file: ./Dockerfile # 指定Dockerfile的路径
         push: true # 推送到Docker Hub
         tags: ${{ env.IMAGE_NAME }}:latest # 镜像标签：jzho/sb-sk5:latest
-        # 如果你想添加其他标签，例如带日期：
-        # tags: |
-        #   ${{ env.IMAGE_NAME }}:latest
-        #   ${{ env.IMAGE_NAME }}:${{ github.sha }} # 使用commit hash作为标签
-        #   ${{ env.IMAGE_NAME }}:${{ github.run_number }} # 使用运行次数作为标签
