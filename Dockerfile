@@ -13,8 +13,3 @@ RUN chmod +x /root/agsb/argosb.sh
 EXPOSE 1080
 EXPOSE 25636/tcp
 EXPOSE 25636/udp
-
-# CMD 和 ENTRYPOINT 会继承 ygkkk/argosb 的设置，
-# 它会继续运行修改后的 /root/agsb/argosb.sh 脚本。
-ENTRYPOINT ["/root/agsb/argosb.sh"]
-CMD ["hypt="]
