@@ -1,15 +1,15 @@
 FROM alpine:latest
 
-# 添加 edge 仓库以获取最新包，并确保 ca-certificates 已安装，用于 HTTPS
-RUN echo "@edge http://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositories \
-    && echo "@edgecommunity http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories \
+# 更换 Alpine Linux 的镜像源为清华大学开源软件镜像站 (tuna.moe)
+# 这通常能提供更稳定的下载，避免 apk add 失败
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.tuna.tsinghua.edu.cn/g' /etc/apk/repositories \
     && apk update \
     && apk add --no-cache ca-certificates
 
 ARG SINGBOX_VERSION="1.11.13" 
 ARG ARCH="amd64" 
 
-# 核心依赖安装 - 专注于最基本的 shell 和文件操作工具
+# 核心依赖安装 - 保持精简
 RUN apk add --no-cache \
     bash \
     curl \
