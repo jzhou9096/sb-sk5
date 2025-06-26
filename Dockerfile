@@ -3,7 +3,7 @@ FROM alpine:latest
 ARG SINGBOX_VERSION="1.11.13" 
 ARG ARCH="amd64" 
 
-# 第一次安装：核心工具
+# 核心安装：只安装最常用的工具
 RUN apk update && apk add --no-cache \
     bash \
     curl \
@@ -15,11 +15,8 @@ RUN apk update && apk add --no-cache \
     sed \
     iproute2 \
     procps \
-    busybox-extras \
+    iptables \
     jq
-
-# 第二次安装：iptables (可能需要单独安装或在不同阶段)
-RUN apk add --no-cache iptables
 
 ENV HOME="/root" 
 RUN mkdir -p "$HOME/agsb"
