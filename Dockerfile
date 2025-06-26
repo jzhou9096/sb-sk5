@@ -3,8 +3,10 @@ FROM alpine:latest
 ARG SINGBOX_VERSION="1.11.13" 
 ARG ARCH="amd64" 
 
-# 核心安装：只安装最常用的工具
+# 确保 apk update 能稳定执行，并安装常见的依赖
+# busybox 提供了大部分核心命令，full/build-base 提供了编译工具和常用系统工具
 RUN apk update && apk add --no-cache \
+    busybox-extras \
     bash \
     curl \
     tar \
@@ -16,7 +18,8 @@ RUN apk update && apk add --no-cache \
     iproute2 \
     procps \
     iptables \
-    jq
+    jq \
+    ca-certificates
 
 ENV HOME="/root" 
 RUN mkdir -p "$HOME/agsb"
