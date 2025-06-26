@@ -32,7 +32,7 @@
       "listen_port": 25635,
       "users": [
         {
-          "username": "hulu",   
+          "username": "hulu",
           "password": "mfxj12356"
         }
       ]
@@ -45,7 +45,6 @@
     }
   ],
   "route": {
-    "rules": [],
-    "default_outbound": "direct"
+    "rules": [] 
   }
 }
