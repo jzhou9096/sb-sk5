@@ -21,8 +21,8 @@
         "alpn": [
           "h3"
         ],
-        "certificate_path": "/etc/sing-box/cert.pem", 
-        "key_path": "/etc/sing-box/private.key"     
+        "certificate_path": "/etc/sing-box/cert.pem",
+        "key_path": "/etc/sing-box/private.key"
       }
     },
     {
@@ -32,7 +32,7 @@
       "listen_port": 25635,
       "users": [
         {
-          "name": "hulu",
+          "username": "hulu",   
           "password": "mfxj12356"
         }
       ]
@@ -43,7 +43,6 @@
       "type": "direct",
       "tag": "direct"
     }
-
   ],
   "route": {
     "rules": [],
