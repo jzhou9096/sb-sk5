@@ -1,35 +1,24 @@
-# 从轻量级的 Alpine Linux 基础镜像开始
-FROM alpine:latest
+# 基于 ygkkk/argosb 镜像
+FROM ygkkk/argosb
 
-# 设置参数，方便管理 Sing-box 版本和架构
-ARG SINGBOX_VERSION="1.11.13" 
-ARG ARCH="amd64" 
+# 安装 jq (用于在运行时修改 JSON)
+RUN apk add --no-cache jq
 
-# 安装 curl 和 tar，用于下载和解压 Sing-box
-RUN apk add --no-cache curl tar
+# 复制你的定制 docker-entrypoint-wrapper.sh 脚本
+COPY docker-entrypoint-wrapper.sh /usr/local/bin/docker-entrypoint-wrapper.sh
 
-# 下载并安装 Sing-box
-WORKDIR /usr/local/bin
-RUN curl -LO "https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/sing-box-${SINGBOX_VERSION}-linux-${ARCH}.tar.gz" \
-    && tar -xzf "sing-box-${SINGBOX_VERSION}-linux-${ARCH}.tar.gz" \
-    && rm "sing-box-${SINGBOX_VERSION}-linux-${ARCH}.tar.gz" \
-    && mv sing-box-*/sing-box . \
-    && chmod +x sing-box
+# 确保它有执行权限
+RUN chmod +x /usr/local/bin/docker-entrypoint-wrapper.sh
 
-# 创建 Sing-box 配置和证书的目录
-RUN mkdir -p /etc/sing-box
-
-# 复制你的 sb.json 配置文件到容器内
-COPY sb.json /etc/sing-box/config.json 
-
-# 复制你的证书文件到容器内
-COPY cert.pem /etc/sing-box/cert.pem
-COPY private.key /etc/sing-box/private.key
-
-# 暴露端口
+# 暴露端口 (声明，实际映射在部署时完成)
+EXPOSE 1080
 EXPOSE 25635/tcp
 EXPOSE 25636/tcp
 EXPOSE 25636/udp
 
-# 定义容器启动时运行的命令
-CMD ["/usr/local/bin/sing-box", "run", "-c", "/etc/sing-box/config.json"]
+# 将你的定制脚本设置为 ENTRYPOINT
+# 这样容器启动时，只会运行这个脚本，它会负责注入并启动原始服务
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint-wrapper.sh"]
+
+# 保持原始镜像的 CMD，它会作为参数传递给 ENTRYPOINT，并在最后被 ENTRYPOINT 执行
+CMD ["node", "index.js"] # 根据你提供的信息，原始CMD是 node index.js
