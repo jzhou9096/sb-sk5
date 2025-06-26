@@ -4,7 +4,7 @@ on:
   workflow_dispatch: # 只保留手动触发工作流的功能
 
 env:
-  IMAGE_NAME: jzho/sb-sk5 # 你在Docker Hub上的镜像名称 (确认 jzhou 是你的用户名)
+  IMAGE_NAME: jzho/3x-ui # 你在Docker Hub上的镜像名称 (确认 jzho 是你的用户名)
 
 jobs:
   build-and-push:
