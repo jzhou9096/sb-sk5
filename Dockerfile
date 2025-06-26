@@ -1,25 +1,28 @@
 FROM alpine:latest
 
+# 添加 edge 仓库以获取最新包，并确保 ca-certificates 已安装，用于 HTTPS
+RUN echo "@edge http://dl-cdn.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositories \
+    && echo "@edgecommunity http://dl-cdn.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories \
+    && apk update \
+    && apk add --no-cache ca-certificates
+
 ARG SINGBOX_VERSION="1.11.13" 
 ARG ARCH="amd64" 
 
-# 确保 apk update 能稳定执行，并安装常见的依赖
-# busybox 提供了大部分核心命令，full/build-base 提供了编译工具和常用系统工具
-RUN apk update && apk add --no-cache \
-    busybox-extras \
+# 核心依赖安装 - 专注于最基本的 shell 和文件操作工具
+RUN apk add --no-cache \
     bash \
     curl \
     tar \
-    coreutils \
-    openssl \
     grep \
-    awk \
     sed \
+    awk \
+    openssl \
+    coreutils \
     iproute2 \
     procps \
     iptables \
-    jq \
-    ca-certificates
+    jq
 
 ENV HOME="/root" 
 RUN mkdir -p "$HOME/agsb"
