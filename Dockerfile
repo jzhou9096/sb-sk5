@@ -16,4 +16,4 @@ EXPOSE 25636/udp
 
 # CMD 和 ENTRYPOINT 会继承 ygkkk/argosb 的设置，
 # 它会继续运行修改后的 /root/agsb/argosb.sh 脚本。
-CMD ["/root/agsb/argosb.sh", "hypt="]
+ENTRYPOINT ["/root/agsb/argosb.sh"]
