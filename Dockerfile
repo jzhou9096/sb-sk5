@@ -1,35 +1,47 @@
-# 使用轻量级的 Alpine Linux 作为基础镜像
 FROM alpine:latest
 
-# 设置构建参数，方便管理 Sing-box 版本和 CPU 架构
-ARG SINGBOX_VERSION="1.11.13" 
-ARG ARCH="amd64" 
+# 安装 argosb.sh 所需的基本工具和 Sing-box 依赖
+RUN apk update && apk add --no-cache \
+    bash \
+    curl \
+    tar \
+    coreutils \
+    openssl \
+    grep \
+    awk \
+    sed \
+    iproute2 \
+    procps \
+    iptables \
+    util-linux \
+    busybox-extras \
+    jq
 
-# 安装 curl 和 tar，用于下载和解压 Sing-box
-RUN apk add --no-cache curl tar
+# 明确设置 HOME 环境变量
+ENV HOME="/root" 
 
-# 下载并安装 Sing-box 可执行文件
-WORKDIR /usr/local/bin
-RUN curl -LO "https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/sing-box-${SINGBOX_VERSION}-linux-${ARCH}.tar.gz" \
-    && tar -xzf "sing-box-${SINGBOX_VERSION}-linux-${ARCH}.tar.gz" \
-    && rm "sing-box-${SINGBOX_VERSION}-linux-${ARCH}.tar.gz" \
-    && mv sing-box-*/sing-box . \
-    && chmod +x sing-box
+# 创建 argosb.sh 所需的目录
+RUN mkdir -p "$HOME/agsb"
 
-# 创建 Sing-box 配置和证书的目录
-RUN mkdir -p /etc/sing-box
+# 预下载 Sing-box 可执行文件（这是 argosb.sh 脚本的依赖）
+# 使用 argosb.sh 内部使用的同一版本和下载链接，确保兼容性
+ARG SINGBOX_VERSION="1.11.13" # 检查 argosb.sh 脚本中使用的 Sing-box 版本
+ARG ARCH="amd64" # 你的CPU架构
 
-# 复制你的 sb.json 配置文件到容器内
-COPY sb.json /etc/sing-box/config.json 
+RUN curl -Lo "$HOME/agsb/sing-box" -# --retry 2 "https://github.com/yonggekkk/ArgoSB/releases/download/singbox/sing-box-${ARCH}" \
+    && chmod +x "$HOME/agsb/sing-box"
 
-# 复制你的证书文件到容器内
-COPY cert.pem /etc/sing-box/cert.pem
-COPY private.key /etc/sing-box/private.key
+# 复制你修改后的 argosb.sh 脚本
+COPY argosb.sh "$HOME/agsb/argosb.sh"
 
-# 暴露端口 
-EXPOSE 25635/tcp 
-EXPOSE 25636/tcp 
-EXPOSE 25636/udp 
+# 赋予 argosb.sh 可执行权限
+RUN chmod +x "$HOME/agsb/argosb.sh"
 
-# 定义容器启动时默认执行的命令
-CMD ["/usr/local/bin/sing-box", "run", "-c", "/etc/sing-box/config.json"]
+# 暴露端口
+EXPOSE 25635/tcp
+EXPOSE 25636/tcp
+EXPOSE 25636/udp
+
+# 定义容器启动命令：直接执行 argosb.sh
+# 传入一个默认协议变量，确保 argosb.sh 能够运行并生成配置
+CMD ["/root/agsb/argosb.sh", "hypt="]
