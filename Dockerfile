@@ -20,10 +20,9 @@ RUN curl -LO "https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_
 RUN mkdir -p /etc/sing-box
 
 # 复制你的 sb.json 配置文件到容器内
-COPY sb.json /etc/sing-box/config.json # 注意：通常 Sing-box 默认配置文件名为 config.json
+COPY sb.json /etc/sing-box/config.json # 确保这一行后面没有中文注释！
 
 # 复制你的证书文件到容器内 (确保这些文件与 Dockerfile 在同一目录，或者在子目录中指定路径)
-# 如果你没有这些文件，请务必从旧容器中 docker cp 出来，或者使用其他方式生成
 COPY cert.pem /etc/sing-box/cert.pem
 COPY private.key /etc/sing-box/private.key
 
