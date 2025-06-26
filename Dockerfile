@@ -1,30 +1,35 @@
-# 1. 选择一个最小化的 Linux 基础镜像
-# Alpine Linux 是极度轻量化的选择
+# 使用轻量级的 Alpine Linux 作为基础镜像
 FROM alpine:latest
 
-# 2. 安装 argosb.sh 脚本所依赖的所有工具
-# 这包括 shell 工具、网络工具、进程管理工具、OpenSSL、以及 sing-box 本身需要的 jq (用于未来可能的高级操作)
+# 设置构建参数，方便管理 Sing-box 版本和 CPU 架构
+ARG SINGBOX_VERSION="1.11.13" 
+ARG ARCH="amd64" 
+
+# 安装 curl 和 tar，用于下载和解压 Sing-box
+RUN apk add --no-cache curl tar
+
+# 下载并安装 Sing-box 可执行文件
 WORKDIR /usr/local/bin
-# 确保所有 Linux 命令都以 RUN 开头
 RUN curl -LO "https://github.com/SagerNet/sing-box/releases/download/v${SINGBOX_VERSION}/sing-box-${SINGBOX_VERSION}-linux-${ARCH}.tar.gz" \
     && tar -xzf "sing-box-${SINGBOX_VERSION}-linux-${ARCH}.tar.gz" \
     && rm "sing-box-${SINGBOX_VERSION}-linux-${ARCH}.tar.gz" \
     && mv sing-box-*/sing-box . \
     && chmod +x sing-box
 
-# 3. 创建 argosb.sh 所需的目录结构
-# argosb.sh 默认会在 $HOME/agsb 下操作
-ENV HOME="/root" 
-RUN mkdir -p $HOME/agsb
+# 创建 Sing-box 配置和证书的目录
+RUN mkdir -p /etc/sing-box
 
+# 复制你的 sb.json 配置文件到容器内
+COPY sb.json /etc/sing-box/config.json 
 
-COPY argosb.sh $HOME/agsb/argosb.sh
+# 复制你的证书文件到容器内
+COPY cert.pem /etc/sing-box/cert.pem
+COPY private.key /etc/sing-box/private.key
 
+# 暴露端口 
+EXPOSE 25635/tcp 
+EXPOSE 25636/tcp 
+EXPOSE 25636/udp 
 
-RUN chmod +x $HOME/agsb/argosb.sh
-
-EXPOSE 25635/tcp # SOCKS5 端口
-EXPOSE 25636/tcp # Hysteria2 TCP 端口
-EXPOSE 25636/udp # Hysteria2 UDP 端口
-
-CMD ["/root/agsb/argosb.sh", "hypt="]
+# 定义容器启动时默认执行的命令
+CMD ["/usr/local/bin/sing-box", "run", "-c", "/etc/sing-box/config.json"]
