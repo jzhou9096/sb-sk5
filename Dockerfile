@@ -1,1 +1,1 @@
-FROM hsanaeii/3x-ui:latest
+FROM mc838/claw-hy2:latest
