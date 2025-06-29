@@ -4,7 +4,7 @@ on:
   workflow_dispatch: # 只保留手动触发工作流的功能
 
 env:
-  IMAGE_NAME: jzho/3x-ui # 你在Docker Hub上的镜像名称 (确认 jzho 是你的用户名)
+  IMAGE_NAME: jzho/claw-hy2 # 你在Docker Hub上的镜像名称 (确认 jzho 是你的用户名)
 
 jobs:
   build-and-push:
@@ -29,4 +29,4 @@ jobs:
         context: . # Dockerfile和上下文在当前目录
         file: ./Dockerfile # 指定Dockerfile的路径
         push: true # 推送到Docker Hub
-        tags: ${{ env.IMAGE_NAME }}:latest # 镜像标签：jzho/sb-sk5:latest
+        tags: ${{ env.IMAGE_NAME }}:latest # 镜像标签：jzho/claw-hy2:latest
